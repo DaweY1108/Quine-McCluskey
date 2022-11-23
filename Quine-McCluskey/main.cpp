@@ -18,115 +18,197 @@
 
 using namespace std;
 
-/*
-* Debug üzenetek megjelenítése
-*/
-bool debugMode = false;
+struct mData {
+	vector<string> binary;
+	vector<string> decimal;
+};
 
 HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+mData minterms;
+mData toPrint;
+mData lastTable;
+string mintermPrint;
+vector<string> mintermList;
 int varCount;
 int steps = 0;
-string mintermList;
 
-stringstream converter;
-vector<string> minterms;
-vector<string> primeImplicants;
-vector<string> lastTable;
+bool detailMode = false;
+bool run = false;
 
-/*
-* Függvények definiálása
-*/
-vector<string> simplifyMinterms();
-string replaceDontCares(string, string);
-string toBinary(int);
+void setup();
+void color(int);
 void getVarCount();
-void getMinterms();
+void getMintermData();
 void mintermToVariable(string, string&, string&);
 void print();
 void printTable(vector<string>);
-void color(int);
+void primeImplicantTable();
 bool isNumber(string);
 bool isGrayCode(string, string);
 bool foundMinterm(vector<string>, string);
 bool isEqual(vector<string>, vector<string>);
+string toBinary(int);
+string replaceDontCares(string, string);
+string getDontCareBits(string);
+string toRomanNumber(int n);
+mData simplifyMinterms();
 
-
-
-/*
-* Fõ függvény
-*/
 int main() {
-    system("title Quine McCluskey v1.0 by.: Varga David");
-    color(7);
-    cout << "Udvozollek a Quine McCluskey programban." << endl;
-    color(14);
-    cout << "ENTER > Program inditasa normal modban" << endl << "Q     > Program inditasa levezeteses modban";
-    char key = _getch();
-    if (key == 'Q' || key == 'q') debugMode = true;
-    system("cls");
-    if (debugMode) {
-        system("title Quine McCluskey by.: Varga David - Levezeteses Mod");
-    }
-    bool run = true;
+	setup();
     while (run) {
         steps = 0;
-        minterms.clear();
-        lastTable.clear();
         getVarCount();
-        getMinterms();
-        sort(minterms.begin(), minterms.end());
+        getMintermData();
         color(8);
         cout << "----------------------------------------------------------" << endl;
         color(10);
         cout << "Valtozok szama: " << varCount << endl;
-        cout << "Mintermek: " << mintermList << endl;
+        cout << "Mintermek: " << mintermPrint << endl;
         color(8);
         cout << "----------------------------------------------------------" << endl << endl;
+        cout << endl << endl << "------------------Egyszerusites 1. Lepese-----------------" << endl << endl;
         do {
             minterms = simplifyMinterms();
-            sort(minterms.begin(), minterms.end());
-        } while (!isEqual(minterms, simplifyMinterms()));
+        } while (!isEqual(minterms.binary, simplifyMinterms().binary));
+        color(8);
+        cout << endl << endl << "------------------Egyszerusites 2. Lepese-----------------" << endl << endl;
+        primeImplicantTable();
+        color(8);
+        cout << endl << endl << "----------------------------------------------------------" << endl << endl;
         print();
-        color(10);
         cout << endl;
         cout << "Ha ujabb egyszerusitest szeretnel elvegezni nyomd meg az ENTER gombot..." << endl;
         cout << "Ha ki szeretnel lepni a programbol, nyomd meg az ESC gombot...";
         int be = _getch();
         system("cls");
         if (be == 27) run = false;
-
     }
     return 0;
 }
 
 /*
-* Egyszerûsítõ algoritmus:
-* 1. Az összes mintermet összehasonlítja
-* 2. Szomszédos mintermek keresése (Gray-kód alapján)
-* 3. Bejelöli, hogy melyik szomszédokat ellenõrizte
-* 4. A szomszédokat is összehasonlítja, majd megnézi, hogy össze tud -e vonni biteket, ha igen, akkor összevonja és belerakja az új listába (Ha még nincs benne olyan)
-* 5. Amelyik mintermeket nem tudta összehasonlítani, azt belerakja az új listába változatlanul (Ha még nincs benne olyan)
-* 6. Visszatér az új listával
-* 7. Addig fut az algoritmus, amíg nem talál több összevonható, mintermet
+* Program indítási beállításai
 */
-vector<string> simplifyMinterms() {
-    if (debugMode && !isEqual(lastTable, minterms)) {
+void setup() {
+    system("title Quine McCluskey v1.0 by.: Varga David");
+    color(7);
+    cout << "Udvozollek a Quine McCluskey programban." << endl;
+    color(14);
+    cout << "ENTER > Program inditasa normal modban" << endl << "Q     > Program inditasa levezeteses modban";
+    char key = _getch();
+    if (key == 'Q' || key == 'q') detailMode = true;
+    system("cls");
+    if (detailMode) {
+        system("title Quine McCluskey by.: Varga David - Levezeteses Mod");
+    }
+    run = true;
+}
+
+/*
+* Mintermek bekérése, majd eltárolása
+*/
+void getMintermData() {
+    minterms.binary.clear();
+    minterms.decimal.clear();
+    mintermList.clear();
+    string temp = "";
+    mintermPrint = "";
+	
+    color(10);
+	cout << "Kerlek add meg a mintermeket vesszovel elvalasztva! pl.: 1,4,5,6" << endl;
+	cout << "Egy minterm erteke 0 es " << pow(2, varCount) - 1 << " kozott lehet!" << endl << endl;
+    color(8);
+    cout << "i=";
+    cin >> temp;
+
+    istringstream is(temp);
+    string m;
+    int n;
+    
+    while (getline(is, m, ',')) {
+        if (isNumber(m)) {
+            n = stoi(m);
+            int max = pow(2, varCount) - 1;
+            if (n <= max && n >= 0) {
+                minterms.binary.push_back(toBinary(n));
+                minterms.decimal.push_back(m);
+                mintermList.push_back(m);
+                mintermPrint = temp;
+            }
+            else {
+                system("cls");
+                color(12);
+                cout << "A mintermek erteke 0 es " << max << " kozott lehet. Kerlek, probald ujra!" << endl;
+                is.clear();
+                getMintermData();
+            }
+        }
+        else {
+            system("cls");
+            color(12);
+            cout << "Csak szamokat adhatsz meg vesszovel elvalasztva. Kerlek, probald ujra!" << endl;
+            is.clear();
+            getMintermData();
+        }
+    }
+    toPrint = minterms;
+    system("cls");
+}
+
+/*
+* Változók számának bekérése n > 0
+*/
+void getVarCount() {
+    string temp;
+    int number = 0;
+	
+	color(10);
+	cout << "Kerlek add meg a valtozok szamat: ";
+	cin >> temp;
+	
+    if (isNumber(temp)) {
+        number = stoi(temp);
+        if (number > 0) {
+            varCount = number;
+        }
+        else {
+            system("cls");
+            color(12);
+            cout << "Csak 0-nal nagyobb szamot adhatsz meg. Kerlek, probald ujra!" << endl;
+            getVarCount();
+        }
+	}
+	else {
+        system("cls");
+		color(12);
+		cout << "Csak szamot adhatsz meg. Kerlek, probald ujra!" << endl;
+		getVarCount();
+	}
+    system("cls");
+}
+
+mData simplifyMinterms() {
+    if (detailMode && !isEqual(lastTable.binary, minterms.binary)) {
         color(10);
-        cout << ++steps << ". Lepes " << endl;
+        cout << toRomanNumber(++steps) << ". Oszlop " << endl;
         color(7);
         cout << "--------------" << endl;
         color(10);
-        printTable(minterms);
+        for (int i = 0; i < toPrint.decimal.size(); i++) {
+            cout << toPrint.decimal[i] << getDontCareBits(toPrint.binary[i]) << endl;
+        }
+        cout << endl;
         color(7);
-        cout << endl << "Osszevonhato mintermek keresese..." << endl;
+        cout << "Osszevonhato mintermek keresese..." << endl;
         color(10);
     }
 
 
-    vector <string> simplifiedMinterms;
-    vector <string> temp;
+    mData simplifiedMinterms;
+    mData tempToPrint;
     bool canSimplify = false;
-    int size = minterms.size();
+    int size = minterms.binary.size();
     int* checkedMinterms = new int[size];
 
     /*
@@ -137,7 +219,7 @@ vector<string> simplifyMinterms() {
             /*
             * Szomszédság ellenõrzése (Gray kód)
             */
-            if (isGrayCode(minterms[i], minterms[j])) {
+            if (isGrayCode(minterms.binary[i], minterms.binary[j])) {
                 /*
                 * Ellenõrzött mintermek megjelölése
                 */
@@ -146,13 +228,15 @@ vector<string> simplifyMinterms() {
                 /*
                 * Összevonható mintermek kiíratása
                 */
-                if (debugMode && !isEqual(lastTable, minterms)) cout << minterms[i] << " es " << minterms[j] << " osszevonhato -> " << replaceDontCares(minterms[i], minterms[j]) << endl;
-                temp.push_back(replaceDontCares(minterms[i], minterms[j]));
+                if (detailMode && !isEqual(lastTable.binary, minterms.binary)) cout << minterms.decimal[i] << " es " << minterms.decimal[j] << " osszevonhato -> " << minterms.decimal[i] << "," << minterms.decimal[j] << getDontCareBits(replaceDontCares(minterms.binary[i], minterms.binary[j])) << endl;
                 /*
                 * Összevont mintermek ellenõrzése. Ha van ugyan olyan minterm a táblába, akkor a következõt már nem írja bele
                 */
-                if (!foundMinterm(simplifiedMinterms, replaceDontCares(minterms[i], minterms[j]))) {
-                    simplifiedMinterms.push_back(replaceDontCares(minterms[i], minterms[j]));
+                if (!foundMinterm(simplifiedMinterms.binary, replaceDontCares(minterms.binary[i], minterms.binary[j]))) {
+                    tempToPrint.decimal.push_back(minterms.decimal[i] + "," + minterms.decimal[j]);
+                    tempToPrint.binary.push_back(replaceDontCares(minterms.binary[i], minterms.binary[j]));
+                    simplifiedMinterms.decimal.push_back(minterms.decimal[i] + "," + minterms.decimal[j]);
+                    simplifiedMinterms.binary.push_back(replaceDontCares(minterms.binary[i], minterms.binary[j]));
                 }
                 canSimplify = true;
             }
@@ -163,31 +247,22 @@ vector<string> simplifyMinterms() {
     * Nem összevonható mintermek beírása az új táblába
     */
     for (int i = 0; i < size; i++) {
-        if (checkedMinterms[i] != 1 && !foundMinterm(simplifiedMinterms, minterms[i])) {
-            temp.push_back(minterms[i]);
-            simplifiedMinterms.push_back(minterms[i]);
+        if (checkedMinterms[i] != 1 && !foundMinterm(simplifiedMinterms.binary, minterms.binary[i])) {
+            simplifiedMinterms.decimal.push_back(minterms.decimal[i]);
+            simplifiedMinterms.binary.push_back(minterms.binary[i]);
         }
     }
 
     /*
     * Mintermek egyszerûsítésének levezetése
     */
-    if (debugMode) {
-        if (!isEqual(lastTable, minterms)) {
-            sort(temp.begin(), temp.end());
+    if (detailMode) {
+        if (!isEqual(lastTable.binary, minterms.binary)) {
             if (canSimplify) {
                 color(7);
-                cout << endl << "Mintermek osszevonasa utan:" << endl;
-                color(10);
-                printTable(temp);
-                color(7);
-                cout << endl << "Azonos mintermek leegyszerusitese 1db-ra..." << endl;
-                cout << "Leegyszerusites utan:" << endl;
-                sort(simplifiedMinterms.begin(), simplifiedMinterms.end());
-                color(10);
-                printTable(simplifiedMinterms);
-                color(7);
-                cout << "--------------\n\n\n\n\n\n";
+                cout << "--------------\n\n\n";
+                cout << "  |  |  |  |  " << endl;
+                cout << "  V  V  V  V  \n\n\n";
             }
             else {
                 color(7);
@@ -196,8 +271,7 @@ vector<string> simplifyMinterms() {
             }
         }
     }
-
-
+    toPrint = tempToPrint;
     lastTable = minterms;
     delete[] checkedMinterms;
     /*
@@ -205,6 +279,77 @@ vector<string> simplifyMinterms() {
     */
     return simplifiedMinterms;
 }
+
+/*
+* A függvény ellenõrzi, hogy két minterm 1 bitben tér -e el
+* pl.: mintermA = 0101, mintermB = 0100 akkor a függvény igazzal tér vissza
+*/
+bool isGrayCode(string mintermA, string mintermB) {
+    int notEqualBits = 0;
+    for (int i = 0; i < mintermA.length(); i++) {
+        if (mintermA[i] != mintermB[i]) notEqualBits++;
+    }
+    return (notEqualBits == 1);
+}
+
+/*
+* A függvény kicseréli "X" karakterre azokat a biteket, amelyek ellentétesek (ponált vagy negált)
+* pl.: 0110 vagy 0111 -> 011X
+* A kötõjelet azért írjuk, mivel azokat a biteket össze tudtuk vonni, ezért többet nem foglalkozunk velük
+*/
+string replaceDontCares(string mintermA, string mintermB) {
+    string a = mintermA;
+    for (int i = 0; i < mintermA.length(); i++) {
+        if (mintermA[i] != mintermB[i]) {
+            a[i] = 'X';
+        }
+    }
+    return a;
+}
+
+string getDontCareBits(string minterm) {
+    int id = minterm.size() - 1;
+    bool foundDontCare = false;
+    string s = "";
+    for (int i = 0; i < minterm.size(); i++) {
+        if (minterm[i] == 'X') {
+            s += (to_string((int)pow(2, id)) + ",");
+            foundDontCare = true;
+        }
+        id--;
+    }
+    if (foundDontCare) {
+        s = "(" + s;
+        s[s.size() - 1] = ')';
+    }
+    return s;
+}
+
+/*
+* A függvény lellenõrzi, hogy a minterm megtalálható e a megadott listában
+*/
+bool foundMinterm(vector<string> mVector, string minterm) {
+    for (int i = 0; i < mVector.size(); i++) {
+        if (mVector[i].compare(minterm) == 0) return true;
+    }
+    return false;
+}
+
+/*
+* A függvény lellenõrzi, hogy a két minterm lista megegyezik
+*/
+bool isEqual(vector<string> vectorA, vector<string> vectorB) {
+    if (vectorA.size() != vectorB.size()) return false;
+    sort(vectorA.begin(), vectorA.end());
+    sort(vectorB.begin(), vectorB.end());
+    for (int i = 0; i < vectorA.size(); i++) {
+        if (vectorA[i] != vectorB[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 
 /*
 * Decimális szám konvertálása binárissá
@@ -234,85 +379,7 @@ string toBinary(int i) {
 }
 
 /*
-* Változók számának bekérése
-*/
-void getVarCount() {
-    string be;
-    color(10);
-    cout << "Kerlek add meg a valtozok szamat: ";
-    cin >> be;
-    if (!isNumber(be)) {
-        system("cls");
-        color(12);
-        cout << "Kerlek szamot adj meg!" << endl;
-        getVarCount();
-    }
-    converter.clear();
-    converter << be;
-    converter >> varCount;
-    if (varCount < 1) {
-        system("cls");
-        color(12);
-        cout << "A valtozok szamanak 1 vagy tobbnek kell lennie!" << endl;
-        getVarCount();
-    }
-    system("cls");
-}
-
-/*
-* Mintermek bekérése
-*/
-void getMinterms() {
-    minterms.clear();
-    lastTable.clear();
-    string input;
-    color(10);
-    cout << "Kerlek add meg a mintermeket vesszovel elvalasztva!" << endl;
-    cout << "Egy mintermnek 0 es " << pow(2, varCount) - 1 << " kozott kell lennie es egy minterm maximum 1x szerepelhet!" << endl << endl;
-    color(8);
-    cout << "i="; cin >> input;
-    mintermList = input;
-    istringstream is(input);
-    string minterm;
-    int mintermNumber;
-    /*
-    * Mintermek szétválasztása
-    */
-    while (getline(is, minterm, ',')) {
-        converter.clear();
-        converter << minterm;
-        converter >> mintermNumber;
-        if (!isNumber(minterm)) {
-            color(12);
-            system("cls");
-            cout << "Kerlek, vesszovel elvalaszott szamokat adj meg!" << endl;
-            getMinterms();
-        }
-        if (mintermNumber >= pow(2, varCount) || mintermNumber < 0) {
-            color(12);
-            system("cls");
-            cout << "Kerlek csak, 0 es " << pow(2, varCount) - 1 << " kozott adj meg szamot!" << endl;
-            getMinterms();
-        }
-        minterms.push_back(toBinary(mintermNumber));
-    }
-    system("cls");
-}
-
-/*
-* A függvény ellenõrzi, hogy két minterm 1 bitben tér -e el
-* pl.: mintermA = 0101, mintermB = 0100 akkor a függvény igazzal tér vissza
-*/
-bool isGrayCode(string mintermA, string mintermB) {
-    int notEqualBits = 0;
-    for (int i = 0; i < mintermA.length(); i++) {
-        if (mintermA[i] != mintermB[i]) notEqualBits++;
-    }
-    return (notEqualBits == 1);
-}
-
-/*
-* A függvény ellenõrzi, hogy az adat szám e
+* A függvény ellenõrzi, hogy a bemenet szám-e
 */
 bool isNumber(string str) {
     for (int i = 0; i < str.length(); i++) {
@@ -321,65 +388,13 @@ bool isNumber(string str) {
     return true;
 }
 
-/*
-* A függvény kicseréli "X" karakterre azokat a biteket, amelyek ellentétesek (ponált vagy negált)
-* pl.: 0110 vagy 0111 -> 011X
-* A kötõjelet azért írjuk, mivel azokat a biteket össze tudtuk vonni, ezért többet nem foglalkozunk velük
-*/
-string replaceDontCares(string mintermA, string mintermB) {
-    string a = mintermA;
-    for (int i = 0; i < mintermA.length(); i++) {
-        if (mintermA[i] != mintermB[i]) {
-            a[i] = 'X';
-        }
-    }
-    return a;
-}
-
-/*
-* A függvény lellenõrzi, hogy a minterm megtalálható e a megadott listában
-*/
-bool foundMinterm(vector<string> mVector, string minterm) {
-    for (int i = 0; i < mVector.size(); i++) {
-        if (mVector[i].compare(minterm) == 0) return true;
-    }
-    return false;
-}
-
-/*
-* A függvény lellenõrzi, hogy a két minterm lista megegyezik
-*/
-bool isEqual(vector<string> vectorA, vector<string> vectorB) {
-    if (vectorA.size() != vectorB.size()) return false;
-    sort(vectorA.begin(), vectorA.end());
-    sort(vectorB.begin(), vectorB.end());
-    for (int i = 0; i < vectorA.size(); i++) {
-        if (vectorA[i] != vectorB[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/*
-* A következõ sorok színének beállítása
-*/
-void color(int color) {
-    SetConsoleTextAttribute(hConsole, color);
-}
-
-/*
-* Mintermlista kiíratása táblázatba
-*/
-void printTable(vector<string> temp) {
-    if (!isEqual(lastTable, minterms)) {
-        for (int i = 0; i < temp.size(); i++) {
-            string ki = temp[i];
-            for (int j = 0; j < temp[i].size(); j++) {
-                cout << ki[j] << " ";
-            }
-            cout << endl;
-        }
+void primeImplicantTable() {
+    string letters = "abcdefghijklmnopqrstuvwxyz";
+    int row = minterms.binary.size();
+    int column = mintermList.size();
+    color(10);
+    for (int i = 0; i < minterms.decimal.size(); i++) {
+        cout << letters[i] << ", " << minterms.decimal[i] << getDontCareBits(minterms.binary[i]) << endl;
     }
 }
 
@@ -394,14 +409,14 @@ void print() {
     color(7);
     cout << "Egyszerusites befejezodott! Eredmeny: " << endl;
     color(10);
-    for (int i = 0; i < minterms.size(); i++) {
-        if (i + 1 < minterms.size()) {
-            mintermToVariable(minterms[i], first, second);
+    for (int i = 0; i < minterms.binary.size(); i++) {
+        if (i + 1 < minterms.binary.size()) {
+            mintermToVariable(minterms.binary[i], first, second);
             first += "   ";
             second += " + ";
         }
         else {
-            mintermToVariable(minterms[i], first, second);
+            mintermToVariable(minterms.binary[i], first, second);
         }
     }
     cout << first << endl << second << endl << endl;
@@ -434,3 +449,28 @@ void mintermToVariable(string bin, string& firstLine, string& secondLine) {
         }
     }
 }
+
+/*
+* A függvény átalakítja az arab számokat római számokká
+*/
+string toRomanNumber(int n) {
+    string str_romans[] = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
+    int values[] = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
+    string result = "";
+    for (int i = 0; i < 13; ++i) {
+        while (n - values[i] >= 0) {
+            result += str_romans[i];
+            n -= values[i];
+        }
+    }
+    return result;
+}
+
+/*
+* Konzol szín beállítása
+*/
+void color(int id) {
+    SetConsoleTextAttribute(hConsole, id);
+}
+
+
