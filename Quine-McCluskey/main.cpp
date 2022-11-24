@@ -2,6 +2,8 @@
 * Készítette: Varga Dávid Zsolt
 */
 
+//Teszt 0,1,2,3,4,5,9,11,12,13,16,17,18,19,25,27
+
 #include <iostream>
 #include <string>
 #include <iomanip>
@@ -30,8 +32,12 @@ HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 mData minterms;
 mData toPrint;
 mData lastTable;
+mData hazardFree;
+mData simplest;
 string mintermPrint;
 vector<string> mintermList;
+vector<string> helpFunction;
+map<string, mData> mMap;
 int varCount;
 int steps = 0;
 
@@ -43,9 +49,12 @@ void color(int);
 void getVarCount();
 void getMintermData();
 void mintermToVariable(string, string&, string&);
-void print();
+void sortByWeightNum(vector<string>& vec);
+void print(mData);
 void printTable(vector<string>);
 void primeImplicantTable();
+int getWeightNum(string);
+bool compare(string, string);
 bool isNumber(string);
 bool isGrayCode(string, string);
 bool foundMinterm(vector<string>, string);
@@ -55,14 +64,21 @@ string replaceDontCares(string, string);
 string getDontCareBits(string);
 string toRomanNumber(int n);
 vector<string> listToVec(string);
+vector<string> simplifyHelpFuncton();
 mData simplifyMinterms();
 
 int main() {
 	setup();
     while (run) {
         steps = 0;
+        /*
+        * Adatok bekérése
+        */
         getVarCount();
         getMintermData();
+        /*
+        * Adatok kiíratása
+        */
         color(8);
         cout << "----------------------------------------------------------" << endl;
         color(10);
@@ -70,17 +86,39 @@ int main() {
         cout << "Mintermek: " << mintermPrint << endl;
         color(8);
         cout << "----------------------------------------------------------" << endl << endl;
-        cout << endl << endl << "------------------Egyszerusites 1. Lepese-----------------" << endl << endl;
+        /*
+        * Egyszerûsítés elsõ lépése
+        */
+        if (detailMode) cout << endl << endl << "------------------Egyszerusites 1. Lepese-----------------" << endl << endl;
         do {
             minterms = simplifyMinterms();
         } while (!isEqual(minterms.binary, simplifyMinterms().binary));
+        hazardFree = minterms;
         color(8);
-        cout << endl << endl << "------------------Egyszerusites 2. Lepese-----------------" << endl << endl;
+        if (detailMode) cout << endl << endl << "----------------------------------------------------------" << endl << endl;
+        /*
+        * Egyszerûsítés második lépése
+        */
+        if (detailMode) cout << endl << endl << "------------------Egyszerusites 2. Lepese-----------------" << endl << endl;
         primeImplicantTable();
         color(8);
-        cout << endl << endl << "----------------------------------------------------------" << endl << endl;
-        print();
-        cout << endl;
+        if (detailMode) cout << endl << endl << "----------------------------------------------------------" << endl << endl;
+        /*
+        * Eredmény kiíratása a képernyõre
+        */
+        cout << endl << endl << "--------------------Egyszerusites vege--------------------" << endl << endl;
+        color(7);
+        cout << "Egyszerusites befejezodott!" << endl << endl;
+        cout << "Legegyszerubb alak:" << endl << endl;
+		print(simplest);
+        color(7);
+        cout << "Legegyszerubb hazardmentes alak:" << endl << endl;
+        print(hazardFree);
+        color(8);
+        cout << "----------------------------------------------------------" << endl << endl;
+        /*
+        * Egyszerûsítés vége
+        */
         cout << "Ha ujabb egyszerusitest szeretnel elvegezni nyomd meg az ENTER gombot..." << endl;
         cout << "Ha ki szeretnel lepni a programbol, nyomd meg az ESC gombot...";
         int be = _getch();
@@ -94,7 +132,7 @@ int main() {
 * Program indítási beállításai
 */
 void setup() {
-    system("title Quine McCluskey v1.0 by.: Varga David");
+    system("title Quine McCluskey v2.0 by.: Varga David Zsolt");
     color(7);
     cout << "Udvozollek a Quine McCluskey programban." << endl;
     color(14);
@@ -103,7 +141,7 @@ void setup() {
     if (key == 'Q' || key == 'q') detailMode = true;
     system("cls");
     if (detailMode) {
-        system("title Quine McCluskey by.: Varga David - Levezeteses Mod");
+        system("title Quine McCluskey v2.0 by.: Varga David Zsolt - Levezeteses Mod");
     }
     run = true;
 }
@@ -134,7 +172,6 @@ void getMintermData() {
             n = stoi(m);
             int max = pow(2, varCount) - 1;
             if (n <= max && n >= 0) {
-                minterms.binary.push_back(toBinary(n));
                 minterms.decimal.push_back(m);
                 mintermList.push_back(m);
                 mintermPrint = temp;
@@ -154,6 +191,10 @@ void getMintermData() {
             is.clear();
             getMintermData();
         }
+    }
+    sortByWeightNum(minterms.decimal);
+    for (int i = 0; i < minterms.decimal.size(); i++) {
+        minterms.binary.push_back(toBinary(stoi(minterms.decimal[i])));
     }
     toPrint = minterms;
     system("cls");
@@ -191,6 +232,16 @@ void getVarCount() {
     system("cls");
 }
 
+/*
+* Egyszerûsítõ algoritmus:
+* 1. Az összes mintermet összehasonlítja
+* 2. Szomszédos mintermek keresése (Gray-kód alapján)
+* 3. Bejelöli, hogy melyik szomszédokat ellenõrizte
+* 4. A szomszédokat is összehasonlítja, majd megnézi, hogy össze tud -e vonni biteket, ha igen, akkor összevonja és belerakja az új listába (Ha még nincs benne olyan)
+* 5. Amelyik mintermeket nem tudta összehasonlítani, azt belerakja az új listába változatlanul (Ha még nincs benne olyan)
+* 6. Visszatér az új listával
+* 7. Addig fut az algoritmus, amíg nem talál több összevonható, mintermet
+*/
 mData simplifyMinterms() {
     if (detailMode && !isEqual(lastTable.binary, minterms.binary)) {
         color(10);
@@ -310,6 +361,9 @@ string replaceDontCares(string mintermA, string mintermB) {
     return a;
 }
 
+/*
+* A függvény lekéri, hogy melyek azok a bitek, amelyekkel nem foglalkozunk. pl.: 1X1X -> (1,4)
+*/
 string getDontCareBits(string minterm) {
     int id = minterm.size() - 1;
     bool foundDontCare = false;
@@ -391,66 +445,195 @@ bool isNumber(string str) {
     return true;
 }
 
+/*
+* Egyszerûsítés második lépése prímimplikáns táblázattal
+*/
 void primeImplicantTable() {
     string letters = "abcdefghijklmnopqrstuvwxyz";
-    char xes[100][100];
+    int row = minterms.binary.size();
+    int column = mintermList.size();
+
+    /*
+    * Dinamikus tömb létrehozása
+    */
+    int** xes = new int* [row];
+    for (int i = 0; i < row; i++) {
+		xes[i] = new int[column];
+    }
+
+    /*
+    * Tömb feltöltése üres karakterekkel
+    */
+    for (int i = 0; i < row; i++) {
+		for (int j = 0; j < column; j++) {
+            xes[i][j] = ' ';
+		}
+    }
+	
+    /*
+    * Prímimplikáns tábla feltöltése
+    */
     for (int i = 0; i < minterms.decimal.size(); i++) {
         vector<string> vec = listToVec(minterms.decimal[i]);
         for (int j = 0; j < vec.size(); j++) {
             for (int k = 0; k < mintermList.size(); k++) {
                 if (vec[j] == mintermList[k]) xes[i][k] = 'X';
-                else xes[i][k] = ' ';
             }
         }
-        cout << endl;
     }
 
-    int row = minterms.binary.size();
-    int column = mintermList.size();
+    /*
+    * Összevont elemek megjelölése egy kisbetûvel
+    */
     color(10);
     for (int i = 0; i < minterms.decimal.size(); i++) {
-        cout << letters[i] << ", " << minterms.decimal[i] << getDontCareBits(minterms.binary[i]) << endl;
+        if (detailMode) cout << letters[i] << ", " << minterms.decimal[i] << getDontCareBits(minterms.binary[i]) << endl;
     }
 
+    /*
+    * Prímimplikáns táblázat kiíratása
+    */
     color(7);
-    cout << endl << "Mintermtabla: " << endl << endl;
+    if (detailMode) cout << endl << "Primimplikans tablazat: " << endl << endl;
     color(10);
 
     for (int i = 0; i <= row; i++) {
         for (int j = 0; j <= column; j++) {
-            if (j == 0 && i == 0) cout << left << setw(3) << " ";
-            if (j == 0 && i != 0) cout << left << setw(3) << letters[i - 1];
-            if (i == 0 && j != 0) cout << left << setw(3) << mintermList[j - 1];
-            if (i != 0 && j != 0) cout << left << setw(3) << xes[i - 1][j - 1];
+            if (j == 0 && i == 0) if (detailMode) cout << left << setw(5) << " ";
+            if (j == 0 && i != 0) if (detailMode) cout << left << setw(5) << letters[i - 1];
+            if (i == 0 && j != 0) if (detailMode) cout << left << setw(5) << mintermList[j - 1];
+            if (i != 0 && j != 0) if (detailMode) cout << left << setw(5) << (char) xes[i - 1][j - 1];
         }
-        cout << endl;
+        if (detailMode) cout << endl;
     }
+
+    /*
+    * X segédfüggvény kiíratása a prímimplikáns tábla alapján
+    */
+    color(7);
+    if (detailMode) cout << endl << "Segedfuggveny: " << endl << endl;
+    color(10);
+    if (detailMode) cout << "X=";
+    string temp;
+    string functionS = "";
+    for (int i = 0; i < column; i++) {
+        temp = "";
+        functionS += "(";
+        for (int j = 0; j < row; j++) {
+            if ((char)xes[j][i] == 'X') {
+                temp += letters[j];
+                functionS = functionS + letters[j] + "+";
+            }
+        }
+        functionS[functionS.size() - 1] = ')';
+        helpFunction.push_back(temp);
+    }
+    if (detailMode) cout << functionS << endl;
+
+    /*
+    * X segédfüggvény egyszerûsítése
+    */
+    helpFunction = simplifyHelpFuncton();
+
+    /*
+    * Egyszerûsített x segédfüggvény kiíratása
+    */
+    color(7);
+    if (detailMode) cout << endl << "Egyszerusitett segedfuggveny: " << endl << endl;
+    color(10);
+    if (detailMode) cout << "X=";
+    for (int i = 0; i < helpFunction.size(); i++) {
+        if (i + 1 < helpFunction.size()) {
+            if (detailMode)cout << helpFunction[i] << "*";
+        }
+        else {
+            if (detailMode)cout << helpFunction[i];
+        }
+    }
+
+    /*
+    * Legegyszerûbb alak kiíratása
+    */
+    if (detailMode) cout << endl;
+    color(7);
+    if (detailMode) cout << endl << "Legegyszerubb alak: " << endl << endl;
+    color(10);
+    if (detailMode) cout << "Q=";
+    for (int i = 0; i < helpFunction.size(); i++) {
+        if (i + 1 < helpFunction.size()) {
+            if (detailMode) cout << helpFunction[i] << "+";
+        }
+        else {
+            if (detailMode) cout << helpFunction[i];
+        }
+    }
+
+    /*
+    * Legegyszerûbb alak adatainak betöltése a tárolóba
+    */
+    simplest.binary.clear();
+    simplest.decimal.clear();
+    if (detailMode) cout << endl << endl;
+    for (int i = 0; i < helpFunction.size(); i++) {
+        string s = helpFunction[i];
+        for (int j = 0; j < letters.size(); j++) {
+            if (s[0] == letters[j]) {
+                if (detailMode) cout << letters[j] << ", " << minterms.decimal[j] << getDontCareBits(minterms.binary[j]) << " > " << minterms.binary[j] << endl;
+                simplest.binary.push_back(minterms.binary[j]);
+                simplest.decimal.push_back(minterms.decimal[j]);
+            }
+        }
+    }
+}
+
+/*
+* Az X segédfüggvény egyszerûsítése a A(A+B) = A alapján.
+* 1. Lépés: Sorbarendezés hossz alapján
+* 2. Lépés: Keresés, hogy van e még ugyan olyan változó benne, ha van, akkor azt a változót kiüti
+* 3. Lépés: Megnézi melyik változók nem lettek kiütve, és azokat beteszi egy új vektorba
+* 4. Lépés: Visszatérés az egyszerûsített vektorral
+*/
+vector<string> simplifyHelpFuncton() {
+    int size = helpFunction.size();
+    sort(helpFunction.begin(), helpFunction.end(), compare);
+    vector<string> temp;
+    for (int i = 0; i < helpFunction.size(); i++) {
+        for (int j = i; j < helpFunction.size(); j++) {
+            if (helpFunction[i].size() < helpFunction[j].size()) {
+                if (helpFunction[j].find(helpFunction[j]) != string::npos) {
+                    helpFunction[j] = "-";
+                }
+            }
+        }
+    }
+    for (int i = 0; i < helpFunction.size(); i++) {
+        if (helpFunction[i] != "-") {
+            if (!foundMinterm(temp, helpFunction[i])) {
+                temp.push_back(helpFunction[i]);
+            }
+        }
+    }
+    return temp;
 }
 
 /*
 * Mintermek kiíratása a képernyõre
 */
-void print() {
+void print(mData md) {
     string first = "    ", second = "Q = ";
-    cout << endl;
-    color(8);
-    cout << "----------------------------------------------------------" << endl;
-    color(7);
-    cout << "Egyszerusites befejezodott! Eredmeny: " << endl;
     color(10);
-    for (int i = 0; i < minterms.binary.size(); i++) {
-        if (i + 1 < minterms.binary.size()) {
-            mintermToVariable(minterms.binary[i], first, second);
+    for (int i = 0; i < md.binary.size(); i++) {
+        if (i + 1 < md.binary.size()) {
+            mintermToVariable(md.binary[i], first, second);
             first += "   ";
             second += " + ";
         }
         else {
-            mintermToVariable(minterms.binary[i], first, second);
+            mintermToVariable(md.binary[i], first, second);
         }
     }
     cout << first << endl << second << endl << endl;
     color(8);
-    cout << "----------------------------------------------------------" << endl;
 }
 
 /*
@@ -495,6 +678,9 @@ string toRomanNumber(int n) {
     return result;
 }
 
+/*
+* A függvény kiszedi a lista elemeit egy vektorba
+*/
 vector<string> listToVec(string s) {
     istringstream is(s);
     string temp;
@@ -506,10 +692,46 @@ vector<string> listToVec(string s) {
 }
 
 /*
+* Vektor sorbarendezése súlyszám alapján
+*/
+void sortByWeightNum(vector<string>& vec) {
+    int size = vec.size();
+    for (int i = 0; i < size - 1; i++) {
+        for (int j = 0; j < size - i - 1; j++) {
+            if (getWeightNum(vec[j]) > getWeightNum(vec[j + 1])) {
+                swap(vec[j], vec[j + 1]);
+            }
+        }
+    }
+}
+
+/*
+* Súlyszám kiszámítása
+*/
+int getWeightNum(string s) {
+    int n = stoi(s);
+    int count = 0;
+    string bin = toBinary(n);
+    for (int i = 0; i < bin.size(); i++) {
+        if (bin[i] == '1') count++;
+    }
+    return count;
+}
+
+/*
 * Konzol szín beállítása
 */
 void color(int id) {
     SetConsoleTextAttribute(hConsole, id);
+}
+
+/*
+* Összehaszonlítás szóhossz alapján
+*/
+bool compare(string str1, string str2) {
+    if (str1.length() < str2.length())
+        return true;
+    return false;
 }
 
 
