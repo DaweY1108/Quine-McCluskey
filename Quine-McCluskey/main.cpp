@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <cstring>
 #include <math.h>
+#include <map>
 #include <Windows.h>
 
 using namespace std;
@@ -24,6 +25,7 @@ struct mData {
 };
 
 HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
 
 mData minterms;
 mData toPrint;
@@ -52,6 +54,7 @@ string toBinary(int);
 string replaceDontCares(string, string);
 string getDontCareBits(string);
 string toRomanNumber(int n);
+vector<string> listToVec(string);
 mData simplifyMinterms();
 
 int main() {
@@ -390,11 +393,37 @@ bool isNumber(string str) {
 
 void primeImplicantTable() {
     string letters = "abcdefghijklmnopqrstuvwxyz";
+    char xes[100][100];
+    for (int i = 0; i < minterms.decimal.size(); i++) {
+        vector<string> vec = listToVec(minterms.decimal[i]);
+        for (int j = 0; j < vec.size(); j++) {
+            for (int k = 0; k < mintermList.size(); k++) {
+                if (vec[j] == mintermList[k]) xes[i][k] = 'X';
+                else xes[i][k] = ' ';
+            }
+        }
+        cout << endl;
+    }
+
     int row = minterms.binary.size();
     int column = mintermList.size();
     color(10);
     for (int i = 0; i < minterms.decimal.size(); i++) {
         cout << letters[i] << ", " << minterms.decimal[i] << getDontCareBits(minterms.binary[i]) << endl;
+    }
+
+    color(7);
+    cout << endl << "Mintermtabla: " << endl << endl;
+    color(10);
+
+    for (int i = 0; i <= row; i++) {
+        for (int j = 0; j <= column; j++) {
+            if (j == 0 && i == 0) cout << left << setw(3) << " ";
+            if (j == 0 && i != 0) cout << left << setw(3) << letters[i - 1];
+            if (i == 0 && j != 0) cout << left << setw(3) << mintermList[j - 1];
+            if (i != 0 && j != 0) cout << left << setw(3) << xes[i - 1][j - 1];
+        }
+        cout << endl;
     }
 }
 
@@ -464,6 +493,16 @@ string toRomanNumber(int n) {
         }
     }
     return result;
+}
+
+vector<string> listToVec(string s) {
+    istringstream is(s);
+    string temp;
+    vector<string> out;
+    while (getline(is, temp, ',')) {
+        out.push_back(temp);
+    }
+    return out;
 }
 
 /*
