@@ -1,8 +1,11 @@
 /*
-* Készítette: Varga Dávid Zsolt
+* Quine-McCluskey egyszerûsítõ algoritmus
+* Készítette: Varga Dávid Zsolt, Neptun kód: OTKHSM
+* Neumann János Egyetem
 */
 
 //Teszt 0,1,2,3,4,5,9,11,12,13,16,17,18,19,25,27
+//Teszt 0,1,4,5,9,10,13,14,16,17,20,21,25,26,27,29
 
 #include <iostream>
 #include <string>
@@ -172,6 +175,7 @@ void getMintermData() {
             n = stoi(m);
             int max = pow(2, varCount) - 1;
             if (n <= max && n >= 0) {
+                minterms.binary.push_back(toBinary(n));
                 minterms.decimal.push_back(m);
                 mintermList.push_back(m);
                 mintermPrint = temp;
@@ -191,10 +195,6 @@ void getMintermData() {
             is.clear();
             getMintermData();
         }
-    }
-    sortByWeightNum(minterms.decimal);
-    for (int i = 0; i < minterms.decimal.size(); i++) {
-        minterms.binary.push_back(toBinary(stoi(minterms.decimal[i])));
     }
     toPrint = minterms;
     system("cls");
@@ -283,6 +283,7 @@ mData simplifyMinterms() {
                 * Összevonható mintermek kiíratása
                 */
                 if (detailMode && !isEqual(lastTable.binary, minterms.binary)) cout << minterms.decimal[i] << " es " << minterms.decimal[j] << " osszevonhato -> " << minterms.decimal[i] << "," << minterms.decimal[j] << getDontCareBits(replaceDontCares(minterms.binary[i], minterms.binary[j])) << endl;
+				
                 /*
                 * Összevont mintermek ellenõrzése. Ha van ugyan olyan minterm a táblába, akkor a következõt már nem írja bele
                 */
@@ -554,6 +555,14 @@ void primeImplicantTable() {
     /*
     * Legegyszerûbb alak kiíratása
     */
+    for (int i = 0; i < helpFunction.size(); i++) {
+        if (helpFunction[i].size() > 1) {
+            string s = helpFunction[i];
+            string s2 = "";
+            s2 += s[0];
+            helpFunction[i] = s2;
+        }
+    }
     if (detailMode) cout << endl;
     color(7);
     if (detailMode) cout << endl << "Legegyszerubb alak: " << endl << endl;
@@ -597,21 +606,28 @@ vector<string> simplifyHelpFuncton() {
     int size = helpFunction.size();
     sort(helpFunction.begin(), helpFunction.end(), compare);
     vector<string> temp;
-    for (int i = 0; i < helpFunction.size(); i++) {
-        for (int j = i; j < helpFunction.size(); j++) {
-            if (helpFunction[i].size() < helpFunction[j].size()) {
-                if (helpFunction[j].find(helpFunction[j]) != string::npos) {
-                    helpFunction[j] = "-";
-                }
-            }
+
+	for (int i = 0; i < size; i++) {
+		for (int j = i + 1; j < size; j++) {
+			if (helpFunction[j].find(helpFunction[i]) != string::npos) {
+				helpFunction[j] = "-";
+			}
+		}
+	}
+    for (int i = 0; i < size; i++) {
+        if (helpFunction[i] != "-") {
+            temp.push_back(helpFunction[i]);
         }
     }
-    for (int i = 0; i < helpFunction.size(); i++) {
-        if (helpFunction[i] != "-") {
-            if (!foundMinterm(temp, helpFunction[i])) {
-                temp.push_back(helpFunction[i]);
+    for (int i = 0; i < temp.size(); i++) {
+        string s = temp[i];
+		for (int j = i + 1; j < temp.size(); j++) {
+            for (int k = 0; k < temp[i].size(); k++) {
+                if (temp[j].find(s[k]) != string::npos) {
+					temp.erase(temp.begin() + j);
+                }
             }
-        }
+		}
     }
     return temp;
 }
