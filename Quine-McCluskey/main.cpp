@@ -175,7 +175,7 @@ void getMintermData() {
             n = stoi(m);
             int max = pow(2, varCount) - 1;
             if (n <= max && n >= 0) {
-                minterms.binary.push_back(toBinary(n));
+                
                 minterms.decimal.push_back(m);
                 mintermList.push_back(m);
                 mintermPrint = temp;
@@ -196,6 +196,10 @@ void getMintermData() {
             getMintermData();
         }
     }
+    sortByWeightNum(minterms.decimal);
+	for (int i = 0; i < minterms.decimal.size(); i++) {
+		minterms.binary.push_back(toBinary(stoi(minterms.decimal[i])));
+	}
     toPrint = minterms;
     system("cls");
 }
@@ -237,10 +241,9 @@ void getVarCount() {
 * 1. Az összes mintermet összehasonlítja
 * 2. Szomszédos mintermek keresése (Gray-kód alapján)
 * 3. Bejelöli, hogy melyik szomszédokat ellenõrizte
-* 4. A szomszédokat is összehasonlítja, majd megnézi, hogy össze tud -e vonni biteket, ha igen, akkor összevonja és belerakja az új listába (Ha még nincs benne olyan)
-* 5. Amelyik mintermeket nem tudta összehasonlítani, azt belerakja az új listába változatlanul (Ha még nincs benne olyan)
-* 6. Visszatér az új listával
-* 7. Addig fut az algoritmus, amíg nem talál több összevonható, mintermet
+* 4. Összevonja a két szomszédos elemet, majd megnézi, hogy az összevont alak megtalûéható e az új vektorban, ha nem, akkor beleírja
+* 5. Visszatér az új listával
+* 6. Addig fut az algoritmus, amíg nem talál több összevonható, mintermet
 */
 mData simplifyMinterms() {
     if (detailMode && !isEqual(lastTable.binary, minterms.binary)) {
@@ -250,7 +253,12 @@ mData simplifyMinterms() {
         cout << "--------------" << endl;
         color(10);
         for (int i = 0; i < toPrint.decimal.size(); i++) {
-            cout << toPrint.decimal[i] << getDontCareBits(toPrint.binary[i]) << endl;
+            cout << toPrint.decimal[i] << getDontCareBits(toPrint.binary[i]) << "  > " << toPrint.binary[i] << endl;
+            if (i + 1 < toPrint.binary.size()) {
+				if (getWeightNum(toPrint.binary[i]) != getWeightNum(toPrint.binary[i + 1])) {
+					cout << "---------" << endl;
+				}
+            }
         }
         cout << endl;
         color(7);
@@ -714,7 +722,7 @@ void sortByWeightNum(vector<string>& vec) {
     int size = vec.size();
     for (int i = 0; i < size - 1; i++) {
         for (int j = 0; j < size - i - 1; j++) {
-            if (getWeightNum(vec[j]) > getWeightNum(vec[j + 1])) {
+            if (getWeightNum(toBinary(stoi(vec[j]))) > getWeightNum(toBinary(stoi(vec[j + 1])))) {
                 swap(vec[j], vec[j + 1]);
             }
         }
@@ -724,10 +732,8 @@ void sortByWeightNum(vector<string>& vec) {
 /*
 * Súlyszám kiszámítása
 */
-int getWeightNum(string s) {
-    int n = stoi(s);
+int getWeightNum(string bin) {
     int count = 0;
-    string bin = toBinary(n);
     for (int i = 0; i < bin.size(); i++) {
         if (bin[i] == '1') count++;
     }
